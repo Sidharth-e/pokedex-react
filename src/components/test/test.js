@@ -43,25 +43,22 @@ const PokemonComponent = () => {
   },[]);
 
   useEffect(() => {
-    let isFetching = false;
+    // Function to load more data when the user reaches 70% of the screen
+    const loadMoreDataOnScroll = async () => {
+      if (!nextUrl || loading) return; // If there's no more data to fetch or already loading, return early.
 
-    const loadMoreData = async () => {
-      if (!nextUrl || isFetching) return;
-
-      const container = containerRef.current;
-      const containerOffset = container.offsetTop + container.clientHeight;
+      // const container = containerRef.current;
+      // const containerOffset = container.offsetTop + container.clientHeight;
       const scrollOffset = window.pageYOffset + window.innerHeight;
+      const scrollPercentage = (scrollOffset / document.documentElement.scrollHeight) * 100;
 
-      if (scrollOffset > containerOffset) {
+      if (scrollPercentage >= 70) {
         try {
-          isFetching = true;
           setLoading(true);
           const response = await fetch(nextUrl);
           const data = await response.json();
 
-          // Ensure the 'results' property is available in the response
           if (data.results && data.results.length > 0) {
-            // Fetch additional details for each Pokemon
             const pokemonWithDetails = await Promise.all(
               data.results.map(async (pokemon) => {
                 const response = await fetch(pokemon.url);
@@ -69,27 +66,23 @@ const PokemonComponent = () => {
               })
             );
 
-            // Update the state with the next set of Pokemon data
             setPokemonData((prevData) => [...prevData, ...pokemonWithDetails]);
             setNextUrl(data.next);
           } else {
-            // If 'results' is not available or empty, consider it as the end of data
             setNextUrl(null);
           }
 
           setLoading(false);
-          isFetching = false;
         } catch (error) {
           console.log("Error fetching more data:", error);
           setLoading(false);
-          isFetching = false;
         }
       }
     };
 
-    window.addEventListener("scroll", loadMoreData);
-    return () => window.removeEventListener("scroll", loadMoreData);
-  }, [nextUrl]);
+    window.addEventListener("scroll", loadMoreDataOnScroll);
+    return () => window.removeEventListener("scroll", loadMoreDataOnScroll);
+  }, [nextUrl, loading]);
 
   const handleCardClick = (pokemon) => {
     setSelectedPokemon(pokemon);
