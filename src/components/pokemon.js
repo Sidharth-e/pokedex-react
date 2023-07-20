@@ -191,8 +191,8 @@ const PokemonComponent = () => {
                   alt={pokemon.name}
                 />
                 <div className={styles.pokedata}>
-                  <p>{pokemon.name}</p>
                   <p>ID: {pokemon.id}</p>
+                  <p>{pokemon.name}</p>
                   {pokemon.types && (
                     <>
                       <ul className={styles.typez}>
