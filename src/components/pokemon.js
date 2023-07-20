@@ -5,7 +5,7 @@ import Modal from 'react-modal';
 const PokemonComponent = () => {
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [limit, setLimit] = useState(20);
+  // const [limit, setLimit] = useState(20);
   const [nextUrl, setNextUrl] = useState('');
   const [selectedPokemon, setSelectedPokemon] = useState(null);
   const [modalIsOpen, setModalIsOpen] = useState(false);
@@ -17,7 +17,7 @@ const PokemonComponent = () => {
     const fetchData = async () => {
       try {
         const response = await fetch(
-          `https://pokeapi.co/api/v2/pokemon/?limit=${limit}`
+          `https://pokeapi.co/api/v2/pokemon/?limit=20`
         );
         const data = await response.json();
         setPokemonData(data.results);
@@ -29,7 +29,7 @@ const PokemonComponent = () => {
     };
 
     fetchData();
-  }, [limit]);
+  }, []);
 
   useEffect(() => {
     const loadMoreData = async () => {
