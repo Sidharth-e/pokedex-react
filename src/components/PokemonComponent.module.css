@@ -1,0 +1,31 @@
+.container{
+  padding: 20px 20px;
+}
+.image{
+  width: 200px;
+}
+.pokemongrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-gap: 40px;
+  }
+  
+  .pokemoncard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 10px;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    border-radius: 10px;
+  }
+  .modal {
+    position: absolute;
+    top: 10%;
+    left: 4%;
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+  }
