@@ -4,6 +4,14 @@
 .image {
   width: 200px;
 }
+.searchInput{
+  border: none;
+  padding: 10px 10px;
+  border-radius: 10px;
+  margin: 20px;
+  width: 15rem;
+  outline: none;
+}
 .pokemongrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -46,7 +54,9 @@
   align-items: center;
 }
 .modalimage {
-  width: 6rem;
+  width: 10rem;
+  position: absolute;
+  top: -8rem;
 }
 .modalcontainer {
   position: fixed;

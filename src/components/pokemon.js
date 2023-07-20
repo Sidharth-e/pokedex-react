@@ -1,15 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
-import styles from './PokemonComponent.module.css';
-import Modal from 'react-modal';
-
+import React, { useState, useEffect, useRef } from "react";
+import styles from "./PokemonComponent.module.css";
+import Modal from "react-modal";
+import Loader from "./loader/loader";
+import Stats from "./circlestats/stats";
+import Heading from "./heading/heading";
 const PokemonComponent = () => {
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
   // const [limit, setLimit] = useState(20);
-  const [nextUrl, setNextUrl] = useState('');
+  const [nextUrl, setNextUrl] = useState("");
   const [selectedPokemon, setSelectedPokemon] = useState(null);
   const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [pokemonDetails, setPokemonDetails] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [noResults, setNoResults] = useState(false);
+  // const [pokemonDetails, setPokemonDetails] = useState(null);
 
   const containerRef = useRef(null);
 
@@ -17,14 +21,23 @@ const PokemonComponent = () => {
     const fetchData = async () => {
       try {
         const response = await fetch(
-          `https://pokeapi.co/api/v2/pokemon/?limit=20`
+          `https://pokeapi.co/api/v2/pokemon/?limit=1000`
         );
         const data = await response.json();
-        setPokemonData(data.results);
+
+        // Fetch additional details for each Pokemon
+        const pokemonWithDetails = await Promise.all(
+          data.results.map(async (pokemon) => {
+            const response = await fetch(pokemon.url);
+            return response.json();
+          })
+        );
+        console.log(pokemonWithDetails);
+        setPokemonData(pokemonWithDetails);
         setNextUrl(data.next);
         setLoading(false);
       } catch (error) {
-        console.log('Error fetching data:', error);
+        console.log("Error fetching data:", error);
       }
     };
 
@@ -32,36 +45,68 @@ const PokemonComponent = () => {
   }, []);
 
   useEffect(() => {
-    const loadMoreData = async () => {
-      if (!nextUrl) return;
-      const container = containerRef.current;
+    // Function to load more data when the user reaches 70% of the screen
+    const loadMoreDataOnScroll = async () => {
+      if (!nextUrl || loading || noResults) return; // If there's no more data to fetch or already loading, return early.
 
-      const containerOffset = container.offsetTop + container.clientHeight;
+      // const container = containerRef.current;
+      // const containerOffset = container.offsetTop + container.clientHeight;
       const scrollOffset = window.pageYOffset + window.innerHeight;
+      const scrollPercentage =
+        (scrollOffset / document.documentElement.scrollHeight) * 100;
 
-      if (scrollOffset > containerOffset) {
+      if (scrollPercentage >= 70) {
         try {
           setLoading(true);
           const response = await fetch(nextUrl);
           const data = await response.json();
-          setPokemonData((prevData) => [...prevData, ...data.results]);
-          setNextUrl(data.next);
+
+          if (data.results && data.results.length > 0) {
+            const pokemonWithDetails = await Promise.all(
+              data.results.map(async (pokemon) => {
+                const response = await fetch(pokemon.url);
+                return response.json();
+              })
+            );
+
+            setPokemonData((prevData) => [...prevData, ...pokemonWithDetails]);
+            setNextUrl(data.next);
+          } else {
+            setNextUrl(null);
+          }
+
           setLoading(false);
         } catch (error) {
-          console.log('Error fetching more data:', error);
+          console.log("Error fetching more data:", error);
+          setLoading(false);
         }
       }
     };
 
-    window.addEventListener('scroll', loadMoreData);
-    return () => window.removeEventListener('scroll', loadMoreData);
-  }, [nextUrl]);
+    window.addEventListener("scroll", loadMoreDataOnScroll);
+    return () => window.removeEventListener("scroll", loadMoreDataOnScroll);
+  }, [nextUrl, loading, noResults]);
 
   const handleCardClick = (pokemon) => {
     setSelectedPokemon(pokemon);
     setModalIsOpen(true);
   };
+  useEffect(() => {
+    // Function to toggle body scroll when the modal is open or closed
+    const toggleBodyScroll = (enableScroll) => {
+      const body = document.querySelector("body");
+      body.style.overflow = enableScroll ? "auto" : "hidden";
+    };
 
+    if (modalIsOpen) {
+      toggleBodyScroll(false); // Disable body scroll when modal is open
+    } else {
+      toggleBodyScroll(true); // Enable body scroll when modal is closed
+    }
+
+    // Clean up the effect to re-enable body scroll when the component unmounts
+    return () => toggleBodyScroll(true);
+  }, [modalIsOpen]);
   useEffect(() => {
     const fetchPokemonDetails = async () => {
       if (selectedPokemon) {
@@ -70,10 +115,9 @@ const PokemonComponent = () => {
             `https://pokeapi.co/api/v2/pokemon/${selectedPokemon.name}`
           );
           const data = await response.json();
-          console.log(data)
-          setPokemonDetails(data);
+          console.log(data);
         } catch (error) {
-          console.log('Error fetching Pokemon details:', error);
+          console.log("Error fetching Pokemon details:", error);
         }
       }
     };
@@ -84,111 +128,184 @@ const PokemonComponent = () => {
   const handleCloseModal = () => {
     setSelectedPokemon(null);
     setModalIsOpen(false);
-    setPokemonDetails(null);
+    // setPokemonDetails(null);
   };
+  const getColor = (type) => {
+    const colors = new Map([
+      ["bug", "#a6b91a"],
+      ["dark", "#705746"],
+      ["dragon", "#6f35fc"],
+      ["electric", "#f7d02c"],
+      ["fairy", "#d685ad"],
+      ["fighting", "#c22e28"],
+      ["fire", "#ee8130"],
+      ["flying", "#a98ff3"],
+      ["ghost", "#735797"],
+      ["grass", "#7ac74c"],
+      ["ground", "#e2bf65"],
+      ["ice", "#96d9d6"],
+      ["normal", "#a8a77a"],
+      ["poison", "#a33ea1"],
+      ["psychic", "#f95587"],
+      ["rock", "#b6a136"],
+      ["steel", "#b7b7ce"],
+      ["water", "#6390f0"],
+    ]);
+    return colors.get(type) || "#777";
+  };
+  const filteredPokemonData = pokemonData.filter((pokemon) =>
+    pokemon.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  useEffect(() => {
+    // Check if there are no results for the current search query
+    setNoResults(filteredPokemonData.length === 0);
+  }, [filteredPokemonData]);
 
   return (
-    <div ref={containerRef} className={styles.container}>
-      <h1>Pokemon List</h1>
-      <div className={styles.pokemongrid}>
-        {pokemonData.map((pokemon) => (
-          <div
-            key={pokemon.name}
-            className={styles.pokemoncard}
-            onClick={() => handleCardClick(pokemon)}
-          >
-            <img
-              className={styles.image}
-              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${
-                pokemon.url.split('/')[6]
-              }.png`}
-              alt={pokemon.name}
-            />
-            <p>{pokemon.name}</p>
+    <>
+      {loading ? (
+        <Loader />
+      ) : (
+        <div ref={containerRef} className={styles.container}>
+          <Heading />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Pokemon"
+            className={styles.searchInput}
+          />
+          <div className={styles.pokemongrid}>
+            {filteredPokemonData.map((pokemon) => (
+              <div
+                key={pokemon.name}
+                className={styles.pokemoncard}
+                onClick={() => handleCardClick(pokemon)}
+                style={{
+                  backgroundColor: getColor(pokemon.types[0].type.name),
+                }}
+              >
+                <img
+                  className={styles.image}
+                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`}
+                  alt={pokemon.name}
+                />
+                <div className={styles.pokedata}>
+                  <p>{pokemon.name}</p>
+                  <p>ID: {pokemon.id}</p>
+                  {pokemon.types && (
+                    <>
+                      <ul className={styles.typez}>
+                        {pokemon.types.map((type) => (
+                          <li
+                            className={styles.typezbutton}
+                            style={{
+                              backgroundColor: getColor(type.type.name),
+                            }}
+                            key={type.type.name}
+                          >
+                            {type.type.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+                {/* Add more details as needed */}
+              </div>
+            ))}
           </div>
-        ))}
-        {loading && <p>Loading more data...</p>}
-      </div>
+          {noResults && !loading && (
+            <div className={styles.noResultsMessage}>
+              No results found. Fetching the next page...
+            </div>
+          )}
 
-      <Modal
-        isOpen={modalIsOpen}
-        onRequestClose={handleCloseModal}
-        contentLabel="Pokemon Details"
-        className={styles.modal}
-      >
-        {selectedPokemon && (
-          <div
-          className={styles.modalcontainer}
+          <Modal
+            isOpen={modalIsOpen}
+            onRequestClose={handleCloseModal}
+            contentLabel="Pokemon Details"
           >
-            <button onClick={handleCloseModal} className={styles.closeButton}>
-              Close
-            </button>
-            <img
-              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${
-                selectedPokemon.url.split('/')[6]
-              }.png`}
-              alt={selectedPokemon.name}
-            />
-            <h2>{selectedPokemon.name}</h2>
-            {pokemonDetails ? (
-              <>
-                <p>Height: {pokemonDetails.height}</p>
-                <p>Weight: {pokemonDetails.weight}</p>
-                <p>Base Experience: {pokemonDetails.base_experience}</p>
-                <h3>Types:</h3>
-            <ul>
-              {pokemonDetails.types.map((type) => (
-                <li key={type.type.name}> {type.type.name}
-                </li>
-              ))}
-            </ul>
-                <h3>Ability:</h3>
-                <ul>
-  
-              {pokemonDetails.abilities.map((ability) => (
-                <li key={ability.ability.name}>
-                   {ability.ability.name}
-                  {ability.is_hidden && <span> (Hidden)</span>}
-                </li>
-              ))}
-            </ul>
-            <h3>Stats:</h3>
-            
-            <ul>
-              {pokemonDetails.stats.map((stat) => (
-                <li key={stat.stat.name}>
-                  {stat.stat.name.charAt(0).toUpperCase() +
-                    stat.stat.name.slice(1)}: {stat.base_stat}
-                </li>
-              ))}
-            </ul>
-            <ul>
-              {pokemonDetails.abilities.map((ability) => (
-                <li key={ability.ability.name}>
-                  Ability: {ability.ability.name}
-                  {ability.is_hidden && <span> (Hidden)</span>}
-                </li>
-              ))}
-            </ul>
-            <h3>Moves:</h3>
-            <ul>
-              {pokemonDetails.moves.map((move) => (
-                <li key={move.move.name}>{move.move.name}
-                </li>
-              ))}
-            </ul>
-
-            
-
-                {/* Additional details */}
-              </>
-            ) : (
-              <p>Loading details...</p>
+            {selectedPokemon && (
+              <div
+                className={styles.modalcontainer}
+                style={{
+                  backgroundColor: getColor(selectedPokemon.types[0].type.name),
+                }}
+              >
+                <button
+                  onClick={handleCloseModal}
+                  className={styles.closeButton}
+                >
+                  Close
+                </button>
+                <div className={styles.modal}>
+                  <img
+                    className={styles.modalimage}
+                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${selectedPokemon.id}.png`}
+                    alt={selectedPokemon.name}
+                  />
+                  <h2>{selectedPokemon.name}</h2>
+                  {selectedPokemon.types && (
+                    <>
+                      <ul className={styles.typez}>
+                        {selectedPokemon.types.map((type) => (
+                          <li
+                            className={styles.typezbutton}
+                            style={{
+                              backgroundColor: getColor(type.type.name),
+                            }}
+                            key={type.type.name}
+                          >
+                            {type.type.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  <h3>Ability</h3>
+                  <ul className={styles.typez}>
+                    {selectedPokemon.abilities.map((ability) => (
+                      <li
+                        className={styles.typezbutton}
+                        style={{ backgroundColor: "red" }}
+                        key={ability.ability.name}
+                      >
+                        {ability.ability.name}
+                        {ability.is_hidden && <span> (Hidden)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className={styles.pokedetailscontainer}>
+                    <div className={styles.pokedetails}>
+                      <p>Height: </p>
+                      <p>{selectedPokemon.height}</p>
+                    </div>
+                    <div className={styles.pokedetails}>
+                      <p>Weight: </p>
+                      <p>{selectedPokemon.weight}</p>
+                    </div>
+                  </div>
+                  <div className={styles.pokemonstats}>
+                    {selectedPokemon.stats.map((stat) => (
+                      <Stats
+                        key={stat.stat.name}
+                        percentage={stat.base_stat}
+                        color="blue"
+                        name={
+                          stat.stat.name.charAt(0).toUpperCase() +
+                          stat.stat.name.slice(1)
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
-          </div>
-        )}
-      </Modal>
-    </div>
+          </Modal>
+        </div>
+      )}
+    </>
   );
 };
 
