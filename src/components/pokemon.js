@@ -4,27 +4,28 @@ import Modal from "react-modal";
 import Loader from "./loader/loader";
 import Stats from "./circlestats/stats";
 import Heading from "./heading/heading";
+import Pagination from '@mui/material/Pagination';
+import Stack from '@mui/material/Stack';
+
 const PokemonComponent = () => {
+  const baseUrl = 'https://pokeapi.co/api/v2/pokemon';
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
-  // const [limit, setLimit] = useState(20);
-  const [nextUrl, setNextUrl] = useState("");
+  const limit = 15;
+  const [page, setPage] = useState(1);
   const [selectedPokemon, setSelectedPokemon] = useState(null);
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [noResults, setNoResults] = useState(false);
-  // const [pokemonDetails, setPokemonDetails] = useState(null);
 
   const containerRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(
-          `https://pokeapi.co/api/v2/pokemon/?limit=1000`
-        );
+        setLoading(true);
+        const response = await fetch(`${baseUrl}?limit=${limit}&offset=${(page - 1) * limit}`);
         const data = await response.json();
-
         // Fetch additional details for each Pokemon
         const pokemonWithDetails = await Promise.all(
           data.results.map(async (pokemon) => {
@@ -32,9 +33,7 @@ const PokemonComponent = () => {
             return response.json();
           })
         );
-        console.log(pokemonWithDetails);
         setPokemonData(pokemonWithDetails);
-        setNextUrl(data.next);
         setLoading(false);
       } catch (error) {
         console.log("Error fetching data:", error);
@@ -42,57 +41,14 @@ const PokemonComponent = () => {
     };
 
     fetchData();
-  }, []);
-
-  useEffect(() => {
-    // Function to load more data when the user reaches 70% of the screen
-    const loadMoreDataOnScroll = async () => {
-      if (!nextUrl || loading || noResults) return; // If there's no more data to fetch or already loading, return early.
-
-      // const container = containerRef.current;
-      // const containerOffset = container.offsetTop + container.clientHeight;
-      const scrollOffset = window.pageYOffset + window.innerHeight;
-      const scrollPercentage =
-        (scrollOffset / document.documentElement.scrollHeight) * 100;
-
-      if (scrollPercentage >= 70) {
-        try {
-          setLoading(true);
-          const response = await fetch(nextUrl);
-          const data = await response.json();
-
-          if (data.results && data.results.length > 0) {
-            const pokemonWithDetails = await Promise.all(
-              data.results.map(async (pokemon) => {
-                const response = await fetch(pokemon.url);
-                return response.json();
-              })
-            );
-
-            setPokemonData((prevData) => [...prevData, ...pokemonWithDetails]);
-            setNextUrl(data.next);
-          } else {
-            setNextUrl(null);
-          }
-
-          setLoading(false);
-        } catch (error) {
-          console.log("Error fetching more data:", error);
-          setLoading(false);
-        }
-      }
-    };
-
-    window.addEventListener("scroll", loadMoreDataOnScroll);
-    return () => window.removeEventListener("scroll", loadMoreDataOnScroll);
-  }, [nextUrl, loading, noResults]);
+  }, [page, limit]);
 
   const handleCardClick = (pokemon) => {
     setSelectedPokemon(pokemon);
     setModalIsOpen(true);
   };
+
   useEffect(() => {
-    // Function to toggle body scroll when the modal is open or closed
     const toggleBodyScroll = (enableScroll) => {
       const body = document.querySelector("body");
       body.style.overflow = enableScroll ? "auto" : "hidden";
@@ -104,15 +60,15 @@ const PokemonComponent = () => {
       toggleBodyScroll(true); // Enable body scroll when modal is closed
     }
 
-    // Clean up the effect to re-enable body scroll when the component unmounts
     return () => toggleBodyScroll(true);
   }, [modalIsOpen]);
+
   useEffect(() => {
     const fetchPokemonDetails = async () => {
       if (selectedPokemon) {
         try {
           const response = await fetch(
-            `https://pokeapi.co/api/v2/pokemon/${selectedPokemon.name}`
+            `${baseUrl}/${selectedPokemon.name}`
           );
           const data = await response.json();
           console.log(data);
@@ -128,8 +84,8 @@ const PokemonComponent = () => {
   const handleCloseModal = () => {
     setSelectedPokemon(null);
     setModalIsOpen(false);
-    // setPokemonDetails(null);
   };
+
   const getColor = (type) => {
     const colors = new Map([
       ["bug", "#a6b91a"],
@@ -153,13 +109,18 @@ const PokemonComponent = () => {
     ]);
     return colors.get(type) || "#777";
   };
+
   const filteredPokemonData = pokemonData.filter((pokemon) =>
     pokemon.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
   useEffect(() => {
-    // Check if there are no results for the current search query
     setNoResults(filteredPokemonData.length === 0);
   }, [filteredPokemonData]);
+
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
 
   return (
     <>
@@ -194,32 +155,38 @@ const PokemonComponent = () => {
                   <p>ID: {pokemon.id}</p>
                   <p>{pokemon.name}</p>
                   {pokemon.types && (
-                    <>
-                      <ul className={styles.typez}>
-                        {pokemon.types.map((type) => (
-                          <li
-                            className={styles.typezbutton}
-                            style={{
-                              backgroundColor: getColor(type.type.name),
-                            }}
-                            key={type.type.name}
-                          >
-                            {type.type.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
+                    <ul className={styles.typez}>
+                      {pokemon.types.map((type) => (
+                        <li
+                          className={styles.typezbutton}
+                          style={{
+                            backgroundColor: getColor(type.type.name),
+                          }}
+                          key={type.type.name}
+                        >
+                          {type.type.name}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-                {/* Add more details as needed */}
               </div>
             ))}
           </div>
           {noResults && !loading && (
             <div className={styles.noResultsMessage}>
-              No results found. Fetching the next page...
+              No results found. Try a different query or fetch more Pokemon.
             </div>
           )}
+
+          <Stack spacing={2} className={styles.pagination}>
+            <Pagination
+              count={Math.ceil(1118 / limit)} // Assuming there are 1118 Pokemon in total
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+            />
+          </Stack>
 
           <Modal
             isOpen={modalIsOpen}
@@ -244,24 +211,27 @@ const PokemonComponent = () => {
                     className={styles.modalimage}
                     src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${selectedPokemon.id}.png`}
                     alt={selectedPokemon.name}
+
+                    style={{
+                      filter: `drop-shadow(30px 10px 4px ${getColor(selectedPokemon.types[0].type.name)})`
+                    }}
                   />
-                  <h2>{selectedPokemon.name}</h2>
+                  <div className={styles.modalDetails}>
+                  <h2 className={styles.pokename}>{selectedPokemon.name}</h2>
                   {selectedPokemon.types && (
-                    <>
-                      <ul className={styles.typez}>
-                        {selectedPokemon.types.map((type) => (
-                          <li
-                            className={styles.typezbutton}
-                            style={{
-                              backgroundColor: getColor(type.type.name),
-                            }}
-                            key={type.type.name}
-                          >
-                            {type.type.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
+                    <ul className={styles.typez}>
+                      {selectedPokemon.types.map((type) => (
+                        <li
+                          className={styles.typezbutton}
+                          style={{
+                            backgroundColor: getColor(type.type.name),
+                          }}
+                          key={type.type.name}
+                        >
+                          {type.type.name}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   <h3>Ability</h3>
                   <ul className={styles.typez}>
@@ -298,6 +268,7 @@ const PokemonComponent = () => {
                         }
                       />
                     ))}
+                  </div>
                   </div>
                 </div>
               </div>
